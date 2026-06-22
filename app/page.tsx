@@ -1,24 +1,35 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useDashboard } from '@/app/hooks/useDashboard';
 import { useTheme } from '@/app/components/ThemeProvider';
 import AlarmBanner from '@/app/components/AlarmBanner';
+import KpiBanner from '@/app/components/KpiBanner';
 import NewTicketsQueue from '@/app/components/NewTicketsQueue';
 import TechnicianLoad from '@/app/components/TechnicianLoad';
 import CriticalClients from '@/app/components/CriticalClients';
 import LiveClock from '@/app/components/LiveClock';
-import { getPriorityLevel } from '@/app/lib/sla';
+import { getPriorityLevel, getSlaInfo } from '@/app/lib/sla';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { data, loading, secondsUntilRefresh, newTickets, inProgressTickets } = useDashboard();
   const { theme, toggle } = useTheme();
 
   const urgentCount = data.tickets.filter(t => getPriorityLevel(t.priorita) === 'urgente').length;
+  const breachCount = newTickets.filter(t => getSlaInfo(t).status === 'breach').length;
+  const allOpen = newTickets.length + inProgressTickets.length;
+  const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breachCount) / allOpen) * 100) : 100;
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.replace('/login');
+  }
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '60px auto 1fr 36px', height: '100vh', background: 'var(--ground)' }}>
+    <div style={{ display: 'grid', gridTemplateRows: '60px auto auto 1fr 36px', height: '100vh', background: 'var(--ground)' }}>
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
       <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
 
         {/* Left: brand */}
@@ -37,15 +48,16 @@ export default function DashboardPage() {
         {/* Center: clock */}
         <LiveClock />
 
-        {/* Right: KPI chips + theme toggle */}
+        {/* Right: actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-          <KpiChip value={data.tickets.length} label="Aperti" />
-          <KpiChip value={newTickets.length} label="In coda" />
-          {urgentCount > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, border: '1px solid var(--urg-border)', background: 'var(--urg-bg)', color: 'var(--urg-text)', whiteSpace: 'nowrap', animation: 'chip-urgency 2s ease-in-out infinite' }}>
-              <b style={{ fontFamily: 'var(--mono)', fontSize: '14px', fontWeight: 700 }}>{urgentCount}</b> Urgenti
-            </span>
-          )}
+          <button
+            onClick={() => router.push('/settings')}
+            aria-label="Impostazioni"
+            title="Impostazioni"
+            style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0, transition: 'background 0.15s' }}
+          >
+            ⚙
+          </button>
           <button
             onClick={toggle}
             aria-label="Cambia tema"
@@ -53,13 +65,30 @@ export default function DashboardPage() {
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
+          <button
+            onClick={handleLogout}
+            aria-label="Disconnetti"
+            title="Disconnetti"
+            style={{ padding: '0 12px', height: 34, borderRadius: '17px', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--text-3)', flexShrink: 0, transition: 'background 0.15s' }}
+          >
+            Esci
+          </button>
         </div>
       </header>
 
-      {/* ── SLA Alarm Banner ────────────────────────────────────────────── */}
+      {/* ── SLA Alarm Banner ──────────────────────────────────────────────── */}
       <AlarmBanner newTickets={newTickets} />
 
-      {/* ── Main Grid ───────────────────────────────────────────────────── */}
+      {/* ── KPI Banner ──────────────────────────────────────────────────────── */}
+      <KpiBanner
+        urgentCount={urgentCount}
+        inQueueCount={newTickets.length}
+        inProgressCount={inProgressTickets.length}
+        closedTodayCount={data.closedToday.length}
+        slaOkPct={slaOkPct}
+      />
+
+      {/* ── Main Grid ───────────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
@@ -84,7 +113,7 @@ export default function DashboardPage() {
         </main>
       )}
 
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      {/* ── Footer ────────────────────────────────────────────────────────── */}
       <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>YDEA CRM v1.0</span>
 
@@ -115,13 +144,5 @@ export default function DashboardPage() {
         <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)', visibility: 'hidden' }}>YDEA CRM v1.0</span>
       </footer>
     </div>
-  );
-}
-
-function KpiChip({ value, label }: { value: number; label: string }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-      <b style={{ fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--text)', fontWeight: 700 }}>{value}</b> {label}
-    </span>
   );
 }

@@ -1,22 +1,32 @@
 import type { Ticket, User, TicketInfo, TicketInfoItem } from '@/app/types';
 
 const BASE_URL = 'https://my.ydea.cloud';
-const API_ID  = process.env.YDEA_API_ID!;
-const API_KEY = process.env.YDEA_API_KEY!;
 
-// In-memory token cache — survives warm Vercel invocations
-let cachedToken: { value: string; expiresAt: number } | null = null;
+export interface YdeaCreds {
+  apiId: string;
+  apiKey: string;
+}
 
-async function getToken(): Promise<string> {
+function envCreds(): YdeaCreds {
+  return {
+    apiId:  process.env.YDEA_API_ID  ?? '',
+    apiKey: process.env.YDEA_API_KEY ?? '',
+  };
+}
+
+// Token cache keyed by "apiId:apiKey"
+const tokenCache = new Map<string, { value: string; expiresAt: number }>();
+
+async function getToken(creds: YdeaCreds): Promise<string> {
+  const key = `${creds.apiId}:${creds.apiKey}`;
+  const cached = tokenCache.get(key);
   const now = Date.now();
-  if (cachedToken && cachedToken.expiresAt > now + 5 * 60_000) {
-    return cachedToken.value;
-  }
+  if (cached && cached.expiresAt > now + 5 * 60_000) return cached.value;
 
   const res = await fetch(`${BASE_URL}/app_api_v2/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: API_ID, api_key: API_KEY }),
+    body: JSON.stringify({ id: creds.apiId, api_key: creds.apiKey }),
     cache: 'no-store',
   });
 
@@ -24,10 +34,9 @@ async function getToken(): Promise<string> {
 
   const data = await res.json();
   const token: string = data.token ?? data.access_token ?? data.bearer_token ?? data.jwt;
-
   if (!token) throw new Error('Token non trovato nella risposta del login');
 
-  cachedToken = { value: token, expiresAt: now + 55 * 60_000 };
+  tokenCache.set(key, { value: token, expiresAt: now + 55 * 60_000 });
   return token;
 }
 
@@ -38,27 +47,24 @@ function authHeaders(token: string) {
   };
 }
 
-async function apiFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const token = await getToken();
+async function apiFetch<T>(path: string, creds: YdeaCreds, params: Record<string, string> = {}): Promise<T> {
+  const token = await getToken(creds);
   const url = new URL(`${BASE_URL}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-
-  const res = await fetch(url.toString(), {
-    headers: authHeaders(token),
-    cache: 'no-store',
-  });
-
+  const res = await fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
   if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
   return res.json() as Promise<T>;
 }
 
-async function fetchWithStates(path: string, statiIds: string[], extraParams: Record<string, string> = {}): Promise<Response> {
-  const token = await getToken();
+async function fetchWithStates(path: string, creds: YdeaCreds, statiIds: string[], extraParams: Record<string, string> = {}): Promise<Response> {
+  const token = await getToken(creds);
   const url = new URL(`${BASE_URL}${path}`);
   statiIds.forEach(id => url.searchParams.append('stato[]', id));
   Object.entries(extraParams).forEach(([k, v]) => url.searchParams.set(k, v));
   return fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
 }
+
+// ── Ticket Info ─────────────────────────────────────────────────────────────
 
 function normaliseInfoField(raw: unknown): TicketInfoItem[] {
   if (!raw) return [];
@@ -78,8 +84,9 @@ function normaliseInfoField(raw: unknown): TicketInfoItem[] {
   return [];
 }
 
-export async function fetchTicketInfo(): Promise<TicketInfo> {
-  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/ticket/info');
+export async function fetchTicketInfo(creds?: YdeaCreds): Promise<TicketInfo> {
+  const c = creds ?? envCreds();
+  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/ticket/info', c);
   return {
     stati:    normaliseInfoField(data.stato   ?? data.stati   ?? data.states),
     priorita: normaliseInfoField(data.priorita ?? data.priorities),
@@ -89,13 +96,16 @@ export async function fetchTicketInfo(): Promise<TicketInfo> {
   };
 }
 
+// ── Tickets ──────────────────────────────────────────────────────────────────
+
 function extractTickets(data: Record<string, unknown>): Ticket[] {
   const list = data.objs ?? data.tickets ?? data.data ?? data.items ?? [];
   return (Array.isArray(list) ? list : []) as Ticket[];
 }
 
-export async function fetchTicketsPage(page = 1, params: Record<string, string> = {}): Promise<{ tickets: Ticket[]; hasMore: boolean }> {
-  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/tickets', {
+export async function fetchTicketsPage(page = 1, creds?: YdeaCreds, params: Record<string, string> = {}): Promise<{ tickets: Ticket[]; hasMore: boolean }> {
+  const c = creds ?? envCreds();
+  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/tickets', c, {
     page: String(page),
     ...params,
   });
@@ -106,33 +116,35 @@ export async function fetchTicketsPage(page = 1, params: Record<string, string> 
   return { tickets, hasMore };
 }
 
-export async function fetchAllOpenTickets(): Promise<Ticket[]> {
+export async function fetchAllOpenTickets(creds?: YdeaCreds): Promise<Ticket[]> {
   const MAX_PAGES = 10;
   const all: Ticket[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const { tickets, hasMore } = await fetchTicketsPage(page);
+    const { tickets, hasMore } = await fetchTicketsPage(page, creds);
     all.push(...tickets);
     if (!hasMore || tickets.length === 0) break;
   }
   return all;
 }
 
-export async function fetchClosedToday(statiIds: string[]): Promise<Ticket[]> {
+export async function fetchClosedToday(statiIds: string[], creds?: YdeaCreds): Promise<Ticket[]> {
   if (statiIds.length === 0) return [];
+  const c = creds ?? envCreds();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-
-  const res = await fetchWithStates('/app_api_v2/tickets', statiIds, {
+  const res = await fetchWithStates('/app_api_v2/tickets', c, statiIds, {
     dataModificaDa: todayStart.toISOString(),
   });
-
   if (!res.ok) return [];
   const data: Record<string, unknown> = await res.json();
   return extractTickets(data);
 }
 
-export async function fetchUsers(): Promise<User[]> {
-  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/users');
+// ── Users ────────────────────────────────────────────────────────────────────
+
+export async function fetchUsers(creds?: YdeaCreds): Promise<User[]> {
+  const c = creds ?? envCreds();
+  const data = await apiFetch<Record<string, unknown>>('/app_api_v2/users', c);
   const list = data.users ?? data.objs ?? data.data ?? data;
   return (Array.isArray(list) ? list : []) as User[];
 }

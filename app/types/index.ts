@@ -15,6 +15,7 @@ export interface Ticket {
   priorita_id: number;
   fonte: string;
   tipo: string;
+  // Questi campi potrebbero non essere presenti nella list response
   assegnatoA?: string;
   contrattoCodice?: string;
   contrattoId?: number;
@@ -77,4 +78,5 @@ export interface DashboardData {
   ticketInfo: TicketInfo;
   lastUpdated: string;
   fetchError?: string;
+  isMock?: boolean;
 }
