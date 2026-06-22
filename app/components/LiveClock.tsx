@@ -10,17 +10,17 @@ export default function LiveClock() {
     return () => clearInterval(tick);
   }, []);
 
-  const dateStr = now.toLocaleDateString('it-IT', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
-  const timeStr = now.toLocaleTimeString('it-IT', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
+  const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateStr = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div className="flex items-center gap-4">
-      <span className="text-slate-400 capitalize">{dateStr}</span>
-      <span className="text-white font-mono font-bold text-base">{timeStr}</span>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: '24px', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text)', lineHeight: 1 }}>
+        {timeStr}
+      </div>
+      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px', textTransform: 'capitalize', letterSpacing: '0.01em' }}>
+        {dateStr}
+      </div>
     </div>
   );
 }

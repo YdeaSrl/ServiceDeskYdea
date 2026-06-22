@@ -9,27 +9,34 @@ interface Props {
 
 export default function AlarmBanner({ newTickets }: Props) {
   const breached = newTickets.filter(t => getSlaInfo(t).status === 'breach');
-  const warning  = newTickets.filter(t => getSlaInfo(t).status === 'warning');
+  const warned   = newTickets.filter(t => getSlaInfo(t).status === 'warning');
 
-  if (breached.length === 0 && warning.length === 0) return null;
+  if (breached.length === 0 && warned.length === 0) return null;
 
   const isBreach = breached.length > 0;
-  const count = isBreach ? breached.length : warning.length;
+  const count = isBreach ? breached.length : warned.length;
   const label = isBreach
-    ? `${count} ticket NUOVO${count > 1 ? 'I' : ''} senza presa in carico da oltre 8h — SLA SCADUTO`
-    : `${count} ticket NUOVO${count > 1 ? 'I' : ''} in scadenza SLA entro 2 ore`;
+    ? `🚨  ${count} ticket NUOVO${count > 1 ? 'I' : ''} senza risposta da oltre 8h — SLA SCADUTO  🚨`
+    : `⚠️  ${count} ticket in scadenza SLA entro 2 ore`;
 
   return (
     <div
-      className={`flex items-center justify-center gap-3 py-3 text-white font-bold text-xl tracking-wide ${
-        isBreach
-          ? 'bg-red-700 animate-pulse'
-          : 'bg-amber-600'
-      }`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '12px',
+        padding: '9px 20px',
+        fontWeight: 700,
+        fontSize: '14px',
+        letterSpacing: '0.02em',
+        color: '#fff',
+        flexShrink: 0,
+        background: isBreach ? 'var(--sla-breach)' : 'var(--sla-warn)',
+        animation: isBreach ? 'alarm-flash 1.4s ease-in-out infinite' : undefined,
+      }}
     >
-      <span className="text-2xl">{isBreach ? '🚨' : '⚠️'}</span>
-      <span>{label}</span>
-      <span className="text-2xl">{isBreach ? '🚨' : '⚠️'}</span>
+      {label}
     </div>
   );
 }

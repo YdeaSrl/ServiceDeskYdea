@@ -1,6 +1,7 @@
 'use client';
 
 import { useDashboard } from '@/app/hooks/useDashboard';
+import { useTheme } from '@/app/components/ThemeProvider';
 import AlarmBanner from '@/app/components/AlarmBanner';
 import NewTicketsQueue from '@/app/components/NewTicketsQueue';
 import TechnicianLoad from '@/app/components/TechnicianLoad';
@@ -10,59 +11,66 @@ import { getPriorityLevel } from '@/app/lib/sla';
 
 export default function DashboardPage() {
   const { data, loading, secondsUntilRefresh, newTickets, inProgressTickets } = useDashboard();
+  const { theme, toggle } = useTheme();
 
   const urgentCount = data.tickets.filter(t => getPriorityLevel(t.priorita) === 'urgente').length;
 
   return (
-    <div className="flex flex-col h-screen bg-[#080d14] overflow-hidden">
+    <div style={{ display: 'grid', gridTemplateRows: '60px auto 1fr 36px', height: '100vh', background: 'var(--ground)' }}>
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 py-3 bg-[#0d1520] border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-slate-400 font-semibold text-sm uppercase tracking-widest">
-            Service Desk — Dashboard Live
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
+
+        {/* Left: brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sla-ok)', animation: 'live-pulse 2s ease-in-out infinite', flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
+            Service Desk
           </span>
-        </div>
-
-        <LiveClock />
-
-        <div className="flex items-center gap-4 text-sm">
-          {urgentCount > 0 && (
-            <span className="bg-red-700 text-white font-bold px-3 py-1 rounded-full animate-pulse">
-              {urgentCount} URGENTI
+          {data.isMock && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', padding: '2px 6px', borderRadius: '4px', background: 'var(--demo-bg)', color: 'var(--demo-color)', border: '1px solid var(--demo-border)', textTransform: 'uppercase' }}>
+              Demo
             </span>
           )}
-          <span className="text-slate-400">
-            Aperti: <span className="text-white font-bold text-lg">{data.tickets.length}</span>
-          </span>
-          <span className="text-slate-400">
-            In coda: <span className="text-blue-400 font-bold text-lg">{newTickets.length}</span>
-          </span>
+        </div>
+
+        {/* Center: clock */}
+        <LiveClock />
+
+        {/* Right: KPI chips + theme toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+          <KpiChip value={data.tickets.length} label="Aperti" />
+          <KpiChip value={newTickets.length} label="In coda" />
+          {urgentCount > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, border: '1px solid var(--urg-border)', background: 'var(--urg-bg)', color: 'var(--urg-text)', whiteSpace: 'nowrap', animation: 'chip-urgency 2s ease-in-out infinite' }}>
+              <b style={{ fontFamily: 'var(--mono)', fontSize: '14px', fontWeight: 700 }}>{urgentCount}</b> Urgenti
+            </span>
+          )}
+          <button
+            onClick={toggle}
+            aria-label="Cambia tema"
+            style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0, transition: 'background 0.15s' }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
-      {/* ── SLA Alarm Banner ────────────────────────────────────────── */}
+      {/* ── SLA Alarm Banner ────────────────────────────────────────────── */}
       <AlarmBanner newTickets={newTickets} />
 
-      {/* ── Main Grid ───────────────────────────────────────────────── */}
+      {/* ── Main Grid ───────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-slate-400 text-xl">Caricamento dati in corso…</p>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>Caricamento…</div>
         </div>
       ) : (
-        <main className="flex-1 grid grid-cols-[38%_28%_34%] gap-3 p-3 min-h-0">
-
-          {/* Colonna 1 — In attesa di presa in carico */}
-          <section className="bg-[#0d1520] rounded-xl border border-slate-800 p-4 min-h-0 flex flex-col">
+        <main style={{ display: 'grid', gridTemplateColumns: '38fr 28fr 34fr', gap: '14px', padding: '14px', minHeight: 0, overflow: 'hidden' }}>
+          <section style={{ minHeight: 0 }}>
             <NewTicketsQueue tickets={newTickets} />
           </section>
-
-          {/* Colonna 2 — Carico tecnici + nuovi + stats */}
-          <section className="min-h-0 flex flex-col">
+          <section style={{ minHeight: 0 }}>
             <TechnicianLoad
               inProgressTickets={inProgressTickets}
               closedToday={data.closedToday}
@@ -70,42 +78,50 @@ export default function DashboardPage() {
               users={data.users}
             />
           </section>
-
-          {/* Colonna 3 — Clienti critici */}
-          <section className="bg-[#0d1520] rounded-xl border border-slate-800 p-4 min-h-0 flex flex-col">
+          <section style={{ minHeight: 0 }}>
             <CriticalClients tickets={data.tickets} />
           </section>
         </main>
       )}
 
-      {/* ── Status Bar ──────────────────────────────────────────────── */}
-      <footer className="flex items-center justify-between px-5 py-2 bg-[#0d1520] border-t border-slate-800 shrink-0 text-sm">
-        <span className="text-slate-600 text-xs">YDEA CRM</span>
+      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>YDEA CRM v1.0</span>
 
-        <div className="flex items-center gap-4">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-2)' }}>
           {data.fetchError ? (
-            <span className="text-red-400 font-semibold">⚠ {data.fetchError}</span>
+            <span style={{ fontSize: '11px', color: 'var(--sla-breach)', fontWeight: 600 }}>⚠ {data.fetchError}</span>
           ) : (
             <>
-              <span className="text-slate-500">
+              <span>
                 Aggiornato alle{' '}
-                <span className="text-slate-300 font-mono">
-                  {new Date(data.lastUpdated).toLocaleTimeString('it-IT')}
-                </span>
+                <b style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>
+                  {new Date(data.lastUpdated).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                </b>
               </span>
-              <span className="text-slate-600">·</span>
-              <span className="text-slate-500">
-                Prossimo refresh in{' '}
-                <span className={`font-mono font-bold ${secondsUntilRefresh <= 10 ? 'text-amber-400' : 'text-slate-300'}`}>
+              <div style={{ width: 72, height: 2, background: 'var(--border)', borderRadius: 1, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 1, width: `${(secondsUntilRefresh / 60) * 100}%`, transition: 'width 1s linear' }} />
+              </div>
+              <span>
+                Refresh in{' '}
+                <b style={{ fontFamily: 'var(--mono)', color: secondsUntilRefresh <= 10 ? 'var(--sla-warn)' : 'var(--text)' }}>
                   {secondsUntilRefresh}s
-                </span>
+                </b>
               </span>
             </>
           )}
         </div>
 
-        <span className="text-slate-600 text-xs">v1.0</span>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)', visibility: 'hidden' }}>YDEA CRM v1.0</span>
       </footer>
     </div>
+  );
+}
+
+function KpiChip({ value, label }: { value: number; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600, border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+      <b style={{ fontFamily: 'var(--mono)', fontSize: '14px', color: 'var(--text)', fontWeight: 700 }}>{value}</b> {label}
+    </span>
   );
 }
