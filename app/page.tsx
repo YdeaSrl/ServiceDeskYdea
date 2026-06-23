@@ -8,9 +8,10 @@ import KpiBanner from '@/app/components/KpiBanner';
 import NewTicketsQueue from '@/app/components/NewTicketsQueue';
 import TechnicianLoad from '@/app/components/TechnicianLoad';
 import CriticalClients from '@/app/components/CriticalClients';
+import UrgentTickets from '@/app/components/UrgentTickets';
 import LiveClock from '@/app/components/LiveClock';
 import Charts from '@/app/components/Charts';
-import { isUrgentActive, getSlaInfo } from '@/app/lib/sla';
+import { isUrgentActive, getSlaInfo, isToday } from '@/app/lib/sla';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -23,22 +24,28 @@ export default function DashboardPage() {
   const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breachCount) / allOpen) * 100) : 100;
 
   const now = new Date();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const apritiSettimana = data.tickets.filter(t => new Date(t.dataCreazione) >= monday).length;
-  const apritiMese = data.tickets.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length;
+  const apritiOggi = data.openedTodayCount ?? data.tickets.filter(t => isToday(t.dataCreazione)).length;
+  const apritiMese = data.openedThisMonthCount ?? data.tickets.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length;
+
+  const urgentTickets = data.tickets.filter(t => isUrgentActive(t));
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
   }
 
+  /* ── 5-row grid ──────────────────────────────────────────────────────────────────
+     Row 1: 56px   header
+     Row 2: auto   alarm banner — ALWAYS a DOM node (div wrapper), height=0 when no alarm
+     Row 3: auto   KPI banner
+     Row 4: 1fr    main 3-column grid  ← gets all remaining space
+     Row 5: 220px  charts
+  ──────────────────────────────────────────────────────────────────────────── */
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '56px auto auto 1fr 130px', height: '100vh', background: 'var(--ground)' }}>
+    <div style={{ display: 'grid', gridTemplateRows: '56px auto auto 1fr 220px', height: '100vh', background: 'var(--ground)' }}>
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
 
         {/* Left: brand */}
@@ -113,23 +120,23 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* ── Alarm banner — div wrapper ensures it is ALWAYS a grid child ──── */}
+      {/* ── SLA Alarm Banner — wrapped in div so it is ALWAYS a grid child ── */}
       <div style={{ flexShrink: 0 }}>
         <AlarmBanner newTickets={newTickets} />
       </div>
 
-      {/* ── KPI Banner ───────────────────────────────────────────────────────── */}
+      {/* ── KPI Banner ──────────────────────────────────────────────────── */}
       <KpiBanner
         urgentCount={urgentActiveCount}
         inAttesaDaNoiCount={inAttesaDaNoiTickets.length}
         inVerificaTecnicaCount={inVerificaTecnicaTickets.length}
         closedTodayCount={data.closedToday.length}
         slaOkPct={slaOkPct}
-        apritiSettimana={apritiSettimana}
+        apritiOggi={apritiOggi}
         apritiMese={apritiMese}
       />
 
-      {/* ── Main Grid (1fr) ───────────────────────────────────────────────────── */}
+      {/* ── Main Grid (1fr — gets all remaining vertical space) ─────────── */}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
@@ -148,13 +155,14 @@ export default function DashboardPage() {
               users={data.users}
             />
           </section>
-          <section style={{ minHeight: 0, height: '100%' }}>
+          <section style={{ minHeight: 0, height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <UrgentTickets tickets={urgentTickets} />
             <CriticalClients tickets={data.tickets} />
           </section>
         </main>
       )}
 
-      {/* ── Charts (fixed 130px) ───────────────────────────────────────────────── */}
+      {/* ── Charts (fixed 220px) ────────────────────────────────────────── */}
       <Charts />
 
     </div>

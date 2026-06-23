@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllTicketsInStates, fetchClosedToday, fetchUsers, fetchTicketInfo, getUserFullName } from '@/app/lib/ydea';
+import { fetchAllTicketsInStates, fetchAllClosedSince, fetchClosedToday, fetchUsers, fetchTicketInfo, getUserFullName } from '@/app/lib/ydea';
 import { isClosedState } from '@/app/lib/sla';
 import { MOCK_DATA } from '@/app/lib/mockData';
 import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
@@ -32,10 +32,26 @@ export async function GET(req: NextRequest) {
       .filter(s => !isClosedState(s.nome))
       .map(s => String(s.id));
 
-    const allTickets = await fetchAllTicketsInStates(openStateIds, creds);
+    const now2 = new Date();
+    const firstOfMonth = new Date(now2.getFullYear(), now2.getMonth(), 1);
+    firstOfMonth.setHours(0, 0, 0, 0);
+    const todayStart = new Date(now2.getFullYear(), now2.getMonth(), now2.getDate());
+
+    const [allTickets, closedToday, closedThisMonth] = await Promise.all([
+      fetchAllTicketsInStates(openStateIds, creds),
+      fetchClosedToday(closedStateIds, creds),
+      fetchAllClosedSince(closedStateIds, firstOfMonth, creds),
+    ]);
+
     const openTickets = allTickets.filter(t => !isClosedState(t.stato));
 
-    const closedToday = await fetchClosedToday(closedStateIds, creds);
+    // Tickets created this month among closed ones (modification date >= firstOfMonth, filter by creation date)
+    const closedCreatedThisMonth = closedThisMonth.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length;
+    const openedThisMonthCount = openTickets.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length + closedCreatedThisMonth;
+
+    // Tickets created today among closed ones (closedToday has dataModifica >= todayStart)
+    const closedCreatedToday = closedToday.filter(t => new Date(t.dataCreazione) >= todayStart).length;
+    const openedTodayCount = openTickets.filter(t => new Date(t.dataCreazione) >= todayStart).length + closedCreatedToday;
 
     const internalUsers = users.filter(u => {
       const ruoli = u['ruoli'] as string[] | undefined;
@@ -50,6 +66,7 @@ export async function GET(req: NextRequest) {
       if (v == null) return true;
       if (typeof v === 'string') return v.trim() === '';
       if (typeof v === 'object' && v !== null) {
+        // Non-empty if any value in the object is a non-empty string
         return !Object.values(v as Record<string, unknown>).some(
           val => typeof val === 'string' && (val as string).trim() !== ''
         );
@@ -73,6 +90,8 @@ export async function GET(req: NextRequest) {
       users: internalUsers,
       ticketInfo,
       lastUpdated: new Date().toISOString(),
+      openedTodayCount,
+      openedThisMonthCount,
     };
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } });

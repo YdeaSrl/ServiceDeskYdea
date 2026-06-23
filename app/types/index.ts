@@ -85,6 +85,8 @@ export interface DashboardData {
   users: User[];
   ticketInfo: TicketInfo;
   lastUpdated: string;
+  openedTodayCount?: number;
+  openedThisMonthCount?: number;
   fetchError?: string;
   isMock?: boolean;
 }
