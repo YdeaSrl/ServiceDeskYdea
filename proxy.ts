@@ -12,9 +12,17 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = req.cookies.get('session')?.value;
-  if (!session || !(await validateSessionToken(session))) {
+  const token = req.cookies.get('session')?.value;
+  const session = token ? await validateSessionToken(token) : null;
+
+  if (!session) {
     return NextResponse.redirect(new URL('/login', req.url));
+  }
+
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    if (session.role !== 'admin') {
+      return NextResponse.json({ error: 'Non autorizzato' }, { status: 403 });
+    }
   }
 
   return NextResponse.next();
