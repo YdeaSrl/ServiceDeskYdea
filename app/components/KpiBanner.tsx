@@ -89,8 +89,8 @@ export default function KpiBanner({
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(7, 1fr)',
-      gap: '8px',
-      padding: '8px 14px',
+      gap: '6px',
+      padding: '6px 12px',
       background: 'var(--ground)',
     }}>
       {tiles.map(tile => (
@@ -100,7 +100,7 @@ export default function KpiBanner({
             background: tile.bg,
             border: `1.5px solid ${tile.border}`,
             borderRadius: 'var(--radius)',
-            padding: '10px 8px 8px',
+            padding: '8px 6px 6px',
             textAlign: 'center',
             boxShadow: 'var(--shadow)',
             animation: tile.pulse ? 'chip-urgency 2s ease-in-out infinite' : undefined,
@@ -108,7 +108,7 @@ export default function KpiBanner({
         >
           <div style={{
             fontFamily: 'var(--mono)',
-            fontSize: '44px',
+            fontSize: '34px',
             fontWeight: 700,
             lineHeight: 1,
             letterSpacing: '-0.03em',
@@ -117,12 +117,12 @@ export default function KpiBanner({
             {tile.value}
           </div>
           <div style={{
-            fontSize: '9px',
+            fontSize: '8px',
             fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.08em',
             color: 'var(--text-3)',
-            marginTop: '5px',
+            marginTop: '4px',
           }}>
             {tile.label}
           </div>

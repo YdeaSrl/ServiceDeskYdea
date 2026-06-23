@@ -36,23 +36,23 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '60px auto auto 1fr 150px 36px', height: '100vh', background: 'var(--ground)' }}>
+    <div style={{ display: 'grid', gridTemplateRows: '56px auto auto 1fr 130px', height: '100vh', background: 'var(--ground)' }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
+      <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
 
         {/* Left: brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://www.ydea.cloud/wp-content/uploads/2023/06/logo_ydea_blu.svg"
             alt="YDEA"
-            style={{ height: 34, width: 'auto', flexShrink: 0 }}
+            style={{ height: 32, width: 'auto', flexShrink: 0 }}
           />
-          <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--sla-ok)', animation: 'live-pulse 2s ease-in-out infinite', flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
+          <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sla-ok)', animation: 'live-pulse 2s ease-in-out infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
               Service Desk
             </span>
           </div>
@@ -66,20 +66,39 @@ export default function DashboardPage() {
         {/* Center: clock */}
         <LiveClock />
 
-        {/* Right: actions */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+        {/* Right: refresh status + actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+
+          {data.fetchError ? (
+            <span style={{ fontSize: '10px', color: 'var(--sla-breach)', fontWeight: 700 }}>⚠ {data.fetchError}</span>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>
+                {new Date(data.lastUpdated).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <div style={{ width: 44, height: 2, background: 'var(--border)', borderRadius: 1, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 1, width: `${(secondsUntilRefresh / 60) * 100}%`, transition: 'width 1s linear' }} />
+              </div>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: secondsUntilRefresh <= 10 ? 'var(--sla-warn)' : 'var(--text-3)' }}>
+                {secondsUntilRefresh}s
+              </span>
+            </div>
+          )}
+
+          <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
+
           <button
             onClick={() => router.push('/settings')}
             aria-label="Impostazioni"
             title="Impostazioni"
-            style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0, transition: 'background 0.15s' }}
+            style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}
           >
             ⚙
           </button>
           <button
             onClick={toggle}
             aria-label="Cambia tema"
-            style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0, transition: 'background 0.15s' }}
+            style={{ width: 30, height: 30, borderRadius: '50%', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
@@ -87,15 +106,17 @@ export default function DashboardPage() {
             onClick={handleLogout}
             aria-label="Disconnetti"
             title="Disconnetti"
-            style={{ padding: '0 12px', height: 34, borderRadius: '17px', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, color: 'var(--text-3)', flexShrink: 0, transition: 'background 0.15s' }}
+            style={{ padding: '0 10px', height: 30, borderRadius: '15px', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', fontSize: '10px', fontWeight: 600, color: 'var(--text-3)', flexShrink: 0 }}
           >
             Esci
           </button>
         </div>
       </header>
 
-      {/* ── SLA Alarm Banner ──────────────────────────────────────────────────── */}
-      <AlarmBanner newTickets={newTickets} />
+      {/* ── Alarm banner — div wrapper ensures it is ALWAYS a grid child ──── */}
+      <div style={{ flexShrink: 0 }}>
+        <AlarmBanner newTickets={newTickets} />
+      </div>
 
       {/* ── KPI Banner ───────────────────────────────────────────────────────── */}
       <KpiBanner
@@ -108,14 +129,14 @@ export default function DashboardPage() {
         apritiMese={apritiMese}
       />
 
-      {/* ── Main Grid ──────────────────────────────────────────────────────────── */}
+      {/* ── Main Grid (1fr) ───────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           <div style={{ fontSize: '12px', color: 'var(--text-3)' }}>Caricamento…</div>
         </div>
       ) : (
-        <main style={{ display: 'grid', gridTemplateColumns: '38fr 28fr 34fr', gap: '14px', padding: '14px', minHeight: 0, overflow: 'hidden' }}>
+        <main style={{ display: 'grid', gridTemplateColumns: '38fr 28fr 34fr', gap: '12px', padding: '12px', minHeight: 0, overflow: 'hidden' }}>
           <section style={{ minHeight: 0, height: '100%' }}>
             <NewTicketsQueue tickets={newTickets} />
           </section>
@@ -133,39 +154,9 @@ export default function DashboardPage() {
         </main>
       )}
 
-      {/* ── Charts ──────────────────────────────────────────────────────────── */}
+      {/* ── Charts (fixed 130px) ───────────────────────────────────────────────── */}
       <Charts />
 
-      {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>YDEA CRM v1.0</span>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '11px', color: 'var(--text-2)' }}>
-          {data.fetchError ? (
-            <span style={{ fontSize: '11px', color: 'var(--sla-breach)', fontWeight: 600 }}>⚠ {data.fetchError}</span>
-          ) : (
-            <>
-              <span>
-                Aggiornato alle{' '}
-                <b style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>
-                  {new Date(data.lastUpdated).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                </b>
-              </span>
-              <div style={{ width: 72, height: 2, background: 'var(--border)', borderRadius: 1, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: 'var(--accent)', borderRadius: 1, width: `${(secondsUntilRefresh / 60) * 100}%`, transition: 'width 1s linear' }} />
-              </div>
-              <span>
-                Refresh in{' '}
-                <b style={{ fontFamily: 'var(--mono)', color: secondsUntilRefresh <= 10 ? 'var(--sla-warn)' : 'var(--text)' }}>
-                  {secondsUntilRefresh}s
-                </b>
-              </span>
-            </>
-          )}
-        </div>
-
-        <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)', visibility: 'hidden' }}>YDEA CRM v1.0</span>
-      </footer>
     </div>
   );
 }
