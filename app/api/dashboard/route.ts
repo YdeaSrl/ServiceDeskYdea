@@ -49,10 +49,23 @@ export async function GET(req: NextRequest) {
     const closedToday = await fetchClosedToday(closedStateIds, creds);
 
     const userMap = new Map(users.map(u => [u.id, getUserFullName(u)]));
+
+    function assigneeIsEmpty(v: unknown): boolean {
+      if (v == null) return true;
+      if (typeof v === 'string') return v.trim() === '';
+      if (typeof v === 'object' && v !== null) {
+        const o = v as Record<string, unknown>;
+        return !o.nome && !o.cognome && !o.name && !o.username && !o.email;
+      }
+      return false;
+    }
+
     const enrichedTickets = openTickets.map(t => {
-      const assigneeId = (t['assegnatoA_id'] ?? t['utente_id'] ?? t['agente_id']) as number | undefined;
-      if (assigneeId && !t.assegnatoA) {
-        return { ...t, assegnatoA: userMap.get(assigneeId) ?? '' };
+      if (assigneeIsEmpty(t.assegnatoA)) {
+        const assigneeId = (
+          t['assegnatoA_id'] ?? t['assegnato_a_id'] ?? t['utente_id'] ?? t['agente_id']
+        ) as number | undefined;
+        if (assigneeId) return { ...t, assegnatoA: userMap.get(assigneeId) ?? '' };
       }
       return t;
     });

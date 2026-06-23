@@ -2,20 +2,20 @@
 
 /* ── Design Tokens ─────────────────────────────────────────────────────── */
 :root {
-  --ground:      #EEF2FF;
+  --ground:      #EDF8FE;
   --surface:     #FFFFFF;
-  --surface-2:   #F5F7FF;
-  --border:      #DDE3F5;
-  --shadow-sm:   0 1px 2px rgba(26,31,86,0.06);
-  --shadow:      0 1px 3px rgba(26,31,86,0.08), 0 4px 12px rgba(26,31,86,0.06);
+  --surface-2:   #F4FBFF;
+  --border:      #C4E7F7;
+  --shadow-sm:   0 1px 2px rgba(0,100,160,0.07);
+  --shadow:      0 1px 3px rgba(0,100,160,0.09), 0 4px 12px rgba(0,100,160,0.06);
 
-  --text:        #1A1F36;
-  --text-2:      #4C5480;
-  --text-3:      #8892B8;
+  --text:        #0A2942;
+  --text-2:      #1E5C8A;
+  --text-3:      #6AAECF;
 
-  --accent:      #3730A3;
-  --accent-soft: #EEF2FF;
-  --accent-mid:  #818CF8;
+  --accent:      #009FE3;
+  --accent-soft: #E3F5FD;
+  --accent-mid:  #33B5E8;
 
   /* Priority colors */
   --urg-stripe: #DC2626; --urg-bg: #FEF2F2; --urg-border: #FECACA; --urg-text: #991B1B;
@@ -50,9 +50,9 @@
   --text-2: #8B949E;
   --text-3: #484F58;
 
-  --accent:      #818CF8;
-  --accent-soft: #1E1B4B;
-  --accent-mid:  #4F46E5;
+  --accent:      #33B5E8;
+  --accent-soft: #003D5C;
+  --accent-mid:  #009FE3;
 
   --urg-stripe: #DC2626; --urg-bg: #3B0A0A; --urg-border: #6B1A1A; --urg-text: #FCA5A5;
   --alt-stripe: #EA580C; --alt-bg: #3B1408; --alt-border: #7C2D12; --alt-text: #FDBA74;

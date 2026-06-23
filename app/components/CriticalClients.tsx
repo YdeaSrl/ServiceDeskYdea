@@ -30,11 +30,8 @@ function buildClientList(tickets: Ticket[]): ClientCriticality[] {
     map.set(id, existing);
   }
   return [...map.values()]
-    .sort((a, b) => {
-      const d = PRIORITY_ORDER.indexOf(a.maxPriority) - PRIORITY_ORDER.indexOf(b.maxPriority);
-      return d !== 0 ? d : b.totalOpen - a.totalOpen;
-    })
-    .slice(0, 7);
+    .sort((a, b) => b.totalOpen - a.totalOpen)
+    .slice(0, 5);
 }
 
 export default function CriticalClients({ tickets }: Props) {

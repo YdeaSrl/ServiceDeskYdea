@@ -64,7 +64,7 @@ async function fetchWithStates(path: string, creds: YdeaCreds, statiIds: string[
   return fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
 }
 
-// ── Ticket Info ─────────────────────────────────────────────────────────────
+// ── Ticket Info ──────────────────────────────────────────────────────────────
 
 function normaliseInfoField(raw: unknown): TicketInfoItem[] {
   if (!raw) return [];
@@ -165,10 +165,14 @@ export function getAssigneeName(ticket: Ticket): string {
     ?? ticket['agente']
     ?? ticket['operatore'];
   if (!raw) return '';
-  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'string') return raw.trim();
   if (typeof raw === 'object' && raw !== null) {
     const obj = raw as Record<string, unknown>;
-    return String(obj.nome ?? obj.cognome ?? obj.name ?? obj.username ?? '');
+    const nome    = String(obj.nome    ?? obj.name      ?? '').trim();
+    const cognome = String(obj.cognome ?? obj.lastName  ?? obj.surname ?? '').trim();
+    if (nome || cognome) return [nome, cognome].filter(Boolean).join(' ');
+    if (obj.username) return String(obj.username).trim();
+    if (obj.email)    return String(obj.email).trim();
   }
   return '';
 }

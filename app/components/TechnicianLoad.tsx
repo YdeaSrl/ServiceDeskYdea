@@ -54,37 +54,29 @@ function PanelHead({ label, count }: { label: string; count?: number }) {
   );
 }
 
-export default function TechnicianLoad({ inProgressTickets, closedToday, newTickets, users }: Props) {
+export default function TechnicianLoad({ inProgressTickets, newTickets, users }: Props) {
   const techLoad = buildTechLoad(inProgressTickets, users);
   const maxLoad = Math.max(1, ...techLoad.map(t => t.ticketCount));
 
   const recentNew = [...newTickets, ...inProgressTickets]
     .filter(t => Date.now() - new Date(t.dataCreazione).getTime() < 3_600_000)
     .sort((a, b) => new Date(b.dataCreazione).getTime() - new Date(a.dataCreazione).getTime())
-    .slice(0, 4);
+    .slice(0, 8);
 
-  const openedToday = [...newTickets, ...inProgressTickets].filter(t => isToday(t.dataCreazione)).length;
-  const closedTodayCount = closedToday.length;
   const allOpen = newTickets.length + inProgressTickets.length;
-  const breachCount = newTickets.filter(t => (Date.now() - new Date(t.dataCreazione).getTime()) / 3_600_000 > 8).length;
-  const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breachCount) / allOpen) * 100) : 100;
-
-  const slaStyle = slaOkPct >= 90
-    ? { background: 'var(--sla-g-bg)', border: `1px solid var(--sla-g-border)`, color: 'var(--sla-ok)' }
-    : slaOkPct >= 70
-    ? { background: 'var(--sla-w-bg)', border: `1px solid var(--sla-w-border)`, color: 'var(--sla-warn)' }
-    : { background: 'var(--urg-bg)', border: `1px solid var(--urg-border)`, color: 'var(--sla-breach)' };
+  const openedToday = [...newTickets, ...inProgressTickets].filter(t => isToday(t.dataCreazione)).length;
+  const breached = newTickets.filter(t => (Date.now() - new Date(t.dataCreazione).getTime()) / 3_600_000 > 8).length;
+  const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breached) / allOpen) * 100) : 100;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '12px' }}>
 
       {/* Carico tecnici */}
-      <Panel style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <Panel style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <PanelHead label="Carico tecnici" />
-        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto' }}>
-          {techLoad.map(tech => {
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {techLoad.filter(t => t.ticketCount > 0).map(tech => {
             const hasUrgent = tech.urgentCount > 0;
-            const isIdle = tech.ticketCount === 0;
             return (
               <div key={tech.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -103,16 +95,14 @@ export default function TechnicianLoad({ inProgressTickets, closedToday, newTick
                   {tech.name.split(' ')[0]}
                 </span>
                 <div style={{ flex: 1, height: 7, background: 'var(--surface-2)', borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                  {!isIdle && (
-                    <div style={{
-                      height: '100%', borderRadius: 4,
-                      width: `${(tech.ticketCount / maxLoad) * 100}%`,
-                      transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
-                      background: hasUrgent
-                        ? 'linear-gradient(90deg, #DC2626, #F87171)'
-                        : 'linear-gradient(90deg, #4F46E5, #818CF8)',
-                    }} />
-                  )}
+                  <div style={{
+                    height: '100%', borderRadius: 4,
+                    width: `${(tech.ticketCount / maxLoad) * 100}%`,
+                    transition: 'width 0.7s cubic-bezier(0.4,0,0.2,1)',
+                    background: hasUrgent
+                      ? 'linear-gradient(90deg, #DC2626, #F87171)'
+                      : 'linear-gradient(90deg, var(--accent), var(--accent-mid))',
+                  }} />
                 </div>
                 <span style={{ fontFamily: 'var(--mono)', fontSize: '13px', fontWeight: 700, width: 18, textAlign: 'right', color: 'var(--text)', flexShrink: 0 }}>
                   {tech.ticketCount}
@@ -124,9 +114,9 @@ export default function TechnicianLoad({ inProgressTickets, closedToday, newTick
       </Panel>
 
       {/* Nuovi ultimi 60 min */}
-      <Panel>
+      <Panel style={{ flex: 1.4, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <PanelHead label="Nuovi ultimi 60 min" count={recentNew.length} />
-        <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {recentNew.length === 0 ? (
             <span style={{ fontSize: '11px', color: 'var(--text-3)', padding: '4px' }}>Nessun nuovo ticket</span>
           ) : recentNew.map(t => (
@@ -141,13 +131,12 @@ export default function TechnicianLoad({ inProgressTickets, closedToday, newTick
 
       {/* KPI tiles */}
       <Panel>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', padding: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', padding: '10px' }}>
           {[
-            { n: openedToday, l: 'Aperti oggi', nc: '#2563EB', ts: {} },
-            { n: closedTodayCount, l: 'Chiusi oggi', nc: 'var(--sla-ok)', ts: {} },
-            { n: `${slaOkPct}%`, l: 'SLA OK', nc: slaStyle.color, ts: { background: slaStyle.background, border: slaStyle.border } },
-          ].map(({ n, l, nc, ts }) => (
-            <div key={l} style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '12px 8px', textAlign: 'center', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)', ...ts }}>
+            { n: openedToday,     l: 'Aperti oggi', nc: 'var(--accent)'  },
+            { n: `${slaOkPct}%`, l: 'SLA OK',      nc: slaOkPct >= 90 ? 'var(--sla-ok)' : slaOkPct >= 70 ? 'var(--sla-warn)' : 'var(--sla-breach)' },
+          ].map(({ n, l, nc }) => (
+            <div key={l} style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '12px 8px', textAlign: 'center', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
               <div style={{ fontFamily: 'var(--mono)', fontSize: '38px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: nc }}>{n}</div>
               <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', marginTop: '4px' }}>{l}</div>
             </div>

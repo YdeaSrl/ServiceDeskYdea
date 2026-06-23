@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { DashboardData } from '@/app/types';
 import { playUrgentAlert, playNewTicketSound } from '@/app/lib/audio';
-import { isNewState, isClosedState, getPriorityLevel } from '@/app/lib/sla';
+import { isNewState, isClosedState, getPriorityLevel, isInAttesaDaNoiState, isInVerificaTecnicaState } from '@/app/lib/sla';
 
 const REFRESH_INTERVAL_MS = 60_000;
 
@@ -103,8 +103,11 @@ export function useDashboard() {
     return () => clearInterval(tick);
   }, []);
 
-  const newTickets = data.tickets.filter(t => isNewState(t.stato));
-  const inProgressTickets = data.tickets.filter(t => !isNewState(t.stato) && !isClosedState(t.stato));
+  // Derived data
+  const newTickets               = data.tickets.filter(t => isNewState(t.stato));
+  const inProgressTickets        = data.tickets.filter(t => !isNewState(t.stato) && !isClosedState(t.stato));
+  const inAttesaDaNoiTickets     = data.tickets.filter(t => isInAttesaDaNoiState(t.stato));
+  const inVerificaTecnicaTickets = data.tickets.filter(t => isInVerificaTecnicaState(t.stato));
 
   return {
     data,
@@ -112,5 +115,7 @@ export function useDashboard() {
     secondsUntilRefresh,
     newTickets,
     inProgressTickets,
+    inAttesaDaNoiTickets,
+    inVerificaTecnicaTickets,
   };
 }
