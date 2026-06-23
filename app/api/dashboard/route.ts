@@ -48,14 +48,23 @@ export async function GET(req: NextRequest) {
 
     const closedToday = await fetchClosedToday(closedStateIds, creds);
 
-    const userMap = new Map(users.map(u => [u.id, getUserFullName(u)]));
+    const internalUsers = users.filter(u => {
+      const ruoli = u['ruoli'] as string[] | undefined;
+      if (Array.isArray(ruoli) && ruoli.includes('ROLE_ESTERNO')) return false;
+      if (u['isCustomerPortal']) return false;
+      return true;
+    });
+
+    const userMap = new Map(internalUsers.map(u => [u.id, getUserFullName(u)]));
 
     function assigneeIsEmpty(v: unknown): boolean {
       if (v == null) return true;
       if (typeof v === 'string') return v.trim() === '';
       if (typeof v === 'object' && v !== null) {
-        const o = v as Record<string, unknown>;
-        return !o.nome && !o.cognome && !o.name && !o.username && !o.email;
+        // Non-empty if any value in the object is a non-empty string
+        return !Object.values(v as Record<string, unknown>).some(
+          val => typeof val === 'string' && (val as string).trim() !== ''
+        );
       }
       return false;
     }
@@ -73,7 +82,7 @@ export async function GET(req: NextRequest) {
     const payload: DashboardData = {
       tickets: enrichedTickets,
       closedToday,
-      users,
+      users: internalUsers,
       ticketInfo,
       lastUpdated: new Date().toISOString(),
     };

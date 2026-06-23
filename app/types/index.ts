@@ -71,6 +71,14 @@ export interface ClientCriticality {
   maxPriority: PriorityLevel;
 }
 
+export interface MonthlyChartPoint { label: string; opened: number; closed: number; }
+export interface ChartsData {
+  monthly: MonthlyChartPoint[];
+  byType: Record<string, number[]>;
+  types: string[];
+  months: string[];
+}
+
 export interface DashboardData {
   tickets: Ticket[];
   closedToday: Ticket[];

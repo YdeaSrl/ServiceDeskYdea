@@ -9,6 +9,7 @@ import NewTicketsQueue from '@/app/components/NewTicketsQueue';
 import TechnicianLoad from '@/app/components/TechnicianLoad';
 import CriticalClients from '@/app/components/CriticalClients';
 import LiveClock from '@/app/components/LiveClock';
+import Charts from '@/app/components/Charts';
 import { isUrgentActive, getSlaInfo } from '@/app/lib/sla';
 
 export default function DashboardPage() {
@@ -35,9 +36,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateRows: '60px auto auto 1fr 36px', height: '100vh', background: 'var(--ground)' }}>
+    <div style={{ display: 'grid', gridTemplateRows: '60px auto auto 1fr 150px 36px', height: '100vh', background: 'var(--ground)' }}>
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 20px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
 
         {/* Left: brand */}
@@ -46,7 +47,7 @@ export default function DashboardPage() {
           <img
             src="https://www.ydea.cloud/wp-content/uploads/2023/06/logo_ydea_blu.svg"
             alt="YDEA"
-            style={{ height: 26, width: 'auto', flexShrink: 0 }}
+            style={{ height: 34, width: 'auto', flexShrink: 0 }}
           />
           <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -93,10 +94,10 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* ── SLA Alarm Banner ────────────────────────────────────────────── */}
+      {/* ── SLA Alarm Banner ──────────────────────────────────────────────────── */}
       <AlarmBanner newTickets={newTickets} />
 
-      {/* ── KPI Banner ──────────────────────────────────────────────────── */}
+      {/* ── KPI Banner ───────────────────────────────────────────────────────── */}
       <KpiBanner
         urgentCount={urgentActiveCount}
         inAttesaDaNoiCount={inAttesaDaNoiTickets.length}
@@ -107,7 +108,7 @@ export default function DashboardPage() {
         apritiMese={apritiMese}
       />
 
-      {/* ── Main Grid ───────────────────────────────────────────────────── */}
+      {/* ── Main Grid ──────────────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
           <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
@@ -115,10 +116,10 @@ export default function DashboardPage() {
         </div>
       ) : (
         <main style={{ display: 'grid', gridTemplateColumns: '38fr 28fr 34fr', gap: '14px', padding: '14px', minHeight: 0, overflow: 'hidden' }}>
-          <section style={{ minHeight: 0 }}>
+          <section style={{ minHeight: 0, height: '100%' }}>
             <NewTicketsQueue tickets={newTickets} />
           </section>
-          <section style={{ minHeight: 0 }}>
+          <section style={{ minHeight: 0, height: '100%' }}>
             <TechnicianLoad
               inProgressTickets={inProgressTickets}
               closedToday={data.closedToday}
@@ -126,13 +127,16 @@ export default function DashboardPage() {
               users={data.users}
             />
           </section>
-          <section style={{ minHeight: 0 }}>
+          <section style={{ minHeight: 0, height: '100%' }}>
             <CriticalClients tickets={data.tickets} />
           </section>
         </main>
       )}
 
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      {/* ── Charts ──────────────────────────────────────────────────────────── */}
+      <Charts />
+
+      {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <footer style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
         <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>YDEA CRM v1.0</span>
 

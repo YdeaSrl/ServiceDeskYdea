@@ -63,10 +63,7 @@ export default function TechnicianLoad({ inProgressTickets, newTickets, users }:
     .sort((a, b) => new Date(b.dataCreazione).getTime() - new Date(a.dataCreazione).getTime())
     .slice(0, 8);
 
-  const allOpen = newTickets.length + inProgressTickets.length;
   const openedToday = [...newTickets, ...inProgressTickets].filter(t => isToday(t.dataCreazione)).length;
-  const breached = newTickets.filter(t => (Date.now() - new Date(t.dataCreazione).getTime()) / 3_600_000 > 8).length;
-  const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breached) / allOpen) * 100) : 100;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '12px' }}>
@@ -129,18 +126,13 @@ export default function TechnicianLoad({ inProgressTickets, newTickets, users }:
         </div>
       </Panel>
 
-      {/* KPI tiles */}
+      {/* KPI tile — Aperti oggi */}
       <Panel>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', padding: '10px' }}>
-          {[
-            { n: openedToday,     l: 'Aperti oggi', nc: 'var(--accent)'  },
-            { n: `${slaOkPct}%`, l: 'SLA OK',      nc: slaOkPct >= 90 ? 'var(--sla-ok)' : slaOkPct >= 70 ? 'var(--sla-warn)' : 'var(--sla-breach)' },
-          ].map(({ n, l, nc }) => (
-            <div key={l} style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '12px 8px', textAlign: 'center', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '38px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: nc }}>{n}</div>
-              <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', marginTop: '4px' }}>{l}</div>
-            </div>
-          ))}
+        <div style={{ padding: '10px' }}>
+          <div style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: '38px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--accent)' }}>{openedToday}</div>
+            <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', marginTop: '4px' }}>Aperti oggi</div>
+          </div>
         </div>
       </Panel>
 
