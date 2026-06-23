@@ -64,7 +64,7 @@ async function fetchWithStates(path: string, creds: YdeaCreds, statiIds: string[
   return fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
 }
 
-// ── Ticket Info ────────────────────────────────────────────
+// ── Ticket Info ──────────────────────────────────────────────────────────────
 
 function normaliseInfoField(raw: unknown): TicketInfoItem[] {
   if (!raw) return [];
@@ -96,7 +96,7 @@ export async function fetchTicketInfo(creds?: YdeaCreds): Promise<TicketInfo> {
   };
 }
 
-// ── Tickets ────────────────────────────────────────────────
+// ── Tickets ──────────────────────────────────────────────────────────────────
 
 function extractTickets(data: Record<string, unknown>): Ticket[] {
   const list = data.objs ?? data.tickets ?? data.data ?? data.items ?? [];
@@ -127,6 +127,34 @@ export async function fetchAllOpenTickets(creds?: YdeaCreds): Promise<Ticket[]> 
   return all;
 }
 
+export async function fetchAllTicketsInStates(statiIds: string[], creds?: YdeaCreds): Promise<Ticket[]> {
+  if (statiIds.length === 0) return [];
+  const c = creds ?? envCreds();
+  const token = await getToken(c);
+  const MAX_PAGES = 300;
+  const all: Ticket[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = new URL(`${BASE_URL}/app_api_v2/tickets`);
+    statiIds.forEach(id => url.searchParams.append('stato[]', id));
+    url.searchParams.set('page', String(page));
+    const res = await fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
+    if (!res.ok) break;
+    const data: Record<string, unknown> = await res.json();
+    const tickets = extractTickets(data);
+    all.push(...tickets);
+    if (tickets.length === 0) break;
+    const total = Number(data.total ?? data.count ?? data.totalCount ?? 0);
+    const perPage = Number(data.perPage ?? data.per_page ?? data.limit ?? 0);
+    if (total > 0 && perPage > 0) {
+      if (total <= page * perPage) break;
+    } else {
+      // YDEA doesn't return pagination info with stato[] filter: stop on partial page
+      if (tickets.length < 20) break;
+    }
+  }
+  return all;
+}
+
 export async function fetchClosedToday(statiIds: string[], creds?: YdeaCreds): Promise<Ticket[]> {
   if (statiIds.length === 0) return [];
   const c = creds ?? envCreds();
@@ -144,7 +172,7 @@ export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?
   if (statiIds.length === 0) return [];
   const c = creds ?? envCreds();
   const token = await getToken(c);
-  const MAX_PAGES = 20;
+  const MAX_PAGES = 300;
   const all: Ticket[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = new URL(`${BASE_URL}/app_api_v2/tickets`);
@@ -157,14 +185,18 @@ export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?
     const tickets = extractTickets(data);
     all.push(...tickets);
     if (tickets.length === 0) break;
-    const total = Number(data.total ?? 0);
-    const perPage = Number(data.perPage ?? data.per_page ?? tickets.length);
-    if (perPage <= 0 || total <= page * perPage) break;
+    const total = Number(data.total ?? data.count ?? data.totalCount ?? 0);
+    const perPage = Number(data.perPage ?? data.per_page ?? data.limit ?? 0);
+    if (total > 0 && perPage > 0) {
+      if (total <= page * perPage) break;
+    } else {
+      if (tickets.length < 20) break;
+    }
   }
   return all;
 }
 
-// ── Users ──────────────────────────────────────────────────
+// ── Users ────────────────────────────────────────────────────────────────────
 
 export async function fetchUsers(creds?: YdeaCreds): Promise<User[]> {
   const c = creds ?? envCreds();

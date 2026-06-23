@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllTicketsInStates, fetchTicketInfo } from '@/app/lib/ydea';
+import { fetchAllTicketsInStates, fetchAllClosedSince, fetchTicketInfo } from '@/app/lib/ydea';
 import { isClosedState } from '@/app/lib/sla';
 import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
 
@@ -26,9 +26,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date();
+    // From January 1st of the current year
     const janFirst = new Date(now.getFullYear(), 0, 1);
     janFirst.setHours(0, 0, 0, 0);
 
+    // Build month keys from January to current month
     const months: string[] = [];
     for (let m = 0; m <= now.getMonth(); m++) {
       const d = new Date(now.getFullYear(), m, 1);
@@ -39,26 +41,24 @@ export async function GET(req: NextRequest) {
     const closedStateIds = ticketInfo.stati.filter(s => isClosedState(s.nome)).map(s => String(s.id));
     const openStateIds = ticketInfo.stati.filter(s => !isClosedState(s.nome)).map(s => String(s.id));
 
-    const [openTickets, allClosedTickets] = await Promise.all([
+    const [openTickets, closedTickets] = await Promise.all([
       fetchAllTicketsInStates(openStateIds, creds),
-      fetchAllTicketsInStates(closedStateIds, creds),
+      fetchAllClosedSince(closedStateIds, janFirst, creds),
     ]);
 
-    const closedTickets = allClosedTickets.filter(t => {
-      const modDate = t.dataModifica ? new Date(t.dataModifica) : new Date(t.dataCreazione);
-      return modDate >= janFirst;
-    });
-
-    const allTicketIds = new Set(openTickets.map(t => t.id));
-    const uniqueClosedTickets = allClosedTickets.filter(t => !allTicketIds.has(t.id));
+    // Deduplicate: a ticket that changed state this year may appear in both sets
+    const openTicketIds = new Set(openTickets.map(t => t.id));
+    const uniqueClosedTickets = closedTickets.filter(t => !openTicketIds.has(t.id));
     const allTickets = [...openTickets, ...uniqueClosedTickets];
 
+    // "Aperti" = all tickets created in each month (regardless of current state)
     const openedByMonth = new Map<string, number>(months.map(m => [m, 0]));
     for (const t of allTickets) {
       const m = toMonthKey(t.dataCreazione);
       if (openedByMonth.has(m)) openedByMonth.set(m, (openedByMonth.get(m) ?? 0) + 1);
     }
 
+    // "Chiusi" = tickets closed (by modification date) in each month
     const closedByMonth = new Map<string, number>(months.map(m => [m, 0]));
     for (const t of closedTickets) {
       const m = toMonthKey(t.dataModifica ?? t.dataCreazione ?? '');
