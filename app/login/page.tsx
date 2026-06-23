@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       if (res.ok) {
         router.replace('/');
@@ -50,7 +51,6 @@ export default function LoginPage() {
         boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
         overflow: 'hidden',
       }}>
-        {/* Header */}
         <div style={{
           padding: '32px 32px 24px',
           borderBottom: '1px solid var(--border)',
@@ -81,25 +81,49 @@ export default function LoginPage() {
               Service Desk
             </span>
           </div>
-          <div style={{
-            fontSize: '22px',
-            fontWeight: 700,
-            color: 'var(--text)',
-            letterSpacing: '-0.02em',
-          }}>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>
             YDEA CRM
           </div>
-          <div style={{
-            fontSize: '13px',
-            color: 'var(--text-2)',
-            marginTop: '4px',
-          }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-2)', marginTop: '4px' }}>
             Dashboard di monitoraggio
           </div>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} style={{ padding: '28px 32px 32px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '11px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: 'var(--text-3)',
+              marginBottom: '8px',
+            }}>
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Il tuo username"
+              autoFocus
+              autoComplete="username"
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${error ? 'var(--sla-breach)' : 'var(--border)'}`,
+                background: 'var(--surface-2)',
+                color: 'var(--text)',
+                fontSize: '15px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
           <div style={{ marginBottom: '20px' }}>
             <label style={{
               display: 'block',
@@ -116,8 +140,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Inserisci la password"
-              autoFocus
+              placeholder="La tua password"
               autoComplete="current-password"
               style={{
                 width: '100%',
@@ -129,7 +152,6 @@ export default function LoginPage() {
                 fontSize: '15px',
                 outline: 'none',
                 boxSizing: 'border-box',
-                transition: 'border-color 0.15s',
                 fontFamily: 'inherit',
               }}
             />
@@ -152,18 +174,17 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || !password}
+            disabled={loading || !username || !password}
             style={{
               width: '100%',
               padding: '12px',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
-              background: loading || !password ? 'var(--surface-2)' : 'var(--accent)',
-              color: loading || !password ? 'var(--text-3)' : '#fff',
+              background: loading || !username || !password ? 'var(--surface-2)' : 'var(--accent)',
+              color: loading || !username || !password ? 'var(--text-3)' : '#fff',
               fontSize: '14px',
               fontWeight: 700,
-              cursor: loading || !password ? 'not-allowed' : 'pointer',
-              transition: 'background 0.15s, color 0.15s',
+              cursor: loading || !username || !password ? 'not-allowed' : 'pointer',
               letterSpacing: '0.03em',
             }}
           >

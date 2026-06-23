@@ -1,22 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllOpenTickets, fetchAllClosedSince, fetchTicketInfo } from '@/app/lib/ydea';
-import type { YdeaCreds } from '@/app/lib/ydea';
+import { fetchAllTicketsInStates, fetchTicketInfo } from '@/app/lib/ydea';
 import { isClosedState } from '@/app/lib/sla';
-import { decryptConfig } from '@/app/lib/session';
+import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
 
 export const dynamic = 'force-dynamic';
 
-async function resolveCreds(req: NextRequest): Promise<YdeaCreds | null> {
-  const cookie = req.cookies.get('ydea_config')?.value;
-  if (cookie) {
-    const cfg = await decryptConfig<YdeaCreds>(cookie);
-    if (cfg?.apiId && cfg?.apiKey) return cfg;
-  }
-  const apiId  = process.env.YDEA_API_ID;
-  const apiKey = process.env.YDEA_API_KEY;
-  if (apiId && apiId !== 'IL_TUO_ID_AZIENDA' && apiKey) return { apiId, apiKey };
-  return null;
-}
 
 function toMonthKey(dateStr: string): string {
   const d = new Date(dateStr);
@@ -31,32 +19,42 @@ function monthLabel(key: string): string {
 }
 
 export async function GET(req: NextRequest) {
-  const creds = await resolveCreds(req);
+  const creds = await resolveCredsFromRequest(req);
   if (!creds) {
     return NextResponse.json({ monthly: [], byType: {}, types: [], months: [] });
   }
 
   try {
     const now = new Date();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    sixMonthsAgo.setHours(0, 0, 0, 0);
+    const janFirst = new Date(now.getFullYear(), 0, 1);
+    janFirst.setHours(0, 0, 0, 0);
 
     const months: string[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    for (let m = 0; m <= now.getMonth(); m++) {
+      const d = new Date(now.getFullYear(), m, 1);
       months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     }
 
     const ticketInfo = await fetchTicketInfo(creds);
     const closedStateIds = ticketInfo.stati.filter(s => isClosedState(s.nome)).map(s => String(s.id));
+    const openStateIds = ticketInfo.stati.filter(s => !isClosedState(s.nome)).map(s => String(s.id));
 
-    const [openTickets, closedTickets] = await Promise.all([
-      fetchAllOpenTickets(creds),
-      fetchAllClosedSince(closedStateIds, sixMonthsAgo, creds),
+    const [openTickets, allClosedTickets] = await Promise.all([
+      fetchAllTicketsInStates(openStateIds, creds),
+      fetchAllTicketsInStates(closedStateIds, creds),
     ]);
 
+    const closedTickets = allClosedTickets.filter(t => {
+      const modDate = t.dataModifica ? new Date(t.dataModifica) : new Date(t.dataCreazione);
+      return modDate >= janFirst;
+    });
+
+    const allTicketIds = new Set(openTickets.map(t => t.id));
+    const uniqueClosedTickets = allClosedTickets.filter(t => !allTicketIds.has(t.id));
+    const allTickets = [...openTickets, ...uniqueClosedTickets];
+
     const openedByMonth = new Map<string, number>(months.map(m => [m, 0]));
-    for (const t of openTickets) {
+    for (const t of allTickets) {
       const m = toMonthKey(t.dataCreazione);
       if (openedByMonth.has(m)) openedByMonth.set(m, (openedByMonth.get(m) ?? 0) + 1);
     }
@@ -68,7 +66,7 @@ export async function GET(req: NextRequest) {
     }
 
     const typeMap = new Map<string, Map<string, number>>();
-    for (const t of [...openTickets, ...closedTickets]) {
+    for (const t of allTickets) {
       const tipo = (t.tipo as string | undefined)?.trim() || 'N/D';
       const m = toMonthKey(t.dataCreazione);
       if (!months.includes(m)) continue;

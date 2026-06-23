@@ -1,52 +1,73 @@
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
+export interface SessionPayload {
+  userId: string;
+  username: string;
+  role: 'admin' | 'user';
+  createdAt: number;
+}
+
 function getSecret(): string {
   return process.env.SESSION_SECRET ?? 'change-me-in-production-please';
 }
 
-async function hmacKey(secret: string): Promise<CryptoKey> {
-  return globalThis.crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify'],
-  );
-}
-
-function b64(buf: ArrayBuffer): string {
+function b64(buf: ArrayBufferLike): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)));
 }
 
-function fromb64(s: string): Uint8Array {
-  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+function fromb64(s: string): Uint8Array<ArrayBuffer> {
+  const raw = atob(s);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
 }
 
-export async function createSessionToken(): Promise<string> {
-  const payload = String(Date.now());
-  const key = await hmacKey(getSecret());
-  const sig = await globalThis.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
-  return `${payload}.${b64(sig)}`;
+async function aesKey(secret: string): Promise<CryptoKey> {
+  const raw = await globalThis.crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveKey'],
+  );
+  return globalThis.crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: new TextEncoder().encode('ydea-session-v2'), iterations: 100_000, hash: 'SHA-256' },
+    raw,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
 }
 
-export async function validateSessionToken(token: string): Promise<boolean> {
+export async function createSessionToken(payload: SessionPayload): Promise<string> {
+  const key = await aesKey(getSecret());
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await globalThis.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
+  const combined = new Uint8Array(12 + encrypted.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), 12);
+  return b64(combined.buffer);
+}
+
+export async function validateSessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const dot = token.lastIndexOf('.');
-    if (dot === -1) return false;
-    const payload = token.slice(0, dot);
-    const sigB64 = token.slice(dot + 1);
-    const ts = parseInt(payload, 10);
-    if (isNaN(ts) || Date.now() - ts > SESSION_TTL_MS) return false;
-    const key = await hmacKey(getSecret());
-    return globalThis.crypto.subtle.verify('HMAC', key, fromb64(sigB64), new TextEncoder().encode(payload));
+    const combined = fromb64(token);
+    const iv = combined.slice(0, 12);
+    const data = combined.slice(12);
+    const key = await aesKey(getSecret());
+    const decrypted = await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+    const payload = JSON.parse(new TextDecoder().decode(decrypted)) as SessionPayload;
+    if (!payload.createdAt || Date.now() - payload.createdAt > SESSION_TTL_MS) return null;
+    if (!payload.userId || !payload.username) return null;
+    return payload;
   } catch {
-    return false;
+    return null;
   }
 }
 
 // ── Config encryption (AES-GCM) ───────────────────────────────────────────
 
-async function aesKey(secret: string): Promise<CryptoKey> {
+async function configAesKey(secret: string): Promise<CryptoKey> {
   const raw = await globalThis.crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret), 'PBKDF2', false, ['deriveKey'],
   );
@@ -60,7 +81,7 @@ async function aesKey(secret: string): Promise<CryptoKey> {
 }
 
 export async function encryptConfig(data: object): Promise<string> {
-  const key = await aesKey(getSecret());
+  const key = await configAesKey(getSecret());
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await globalThis.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -78,7 +99,7 @@ export async function decryptConfig<T>(token: string): Promise<T | null> {
     const combined = fromb64(token);
     const iv = combined.slice(0, 12);
     const data = combined.slice(12);
-    const key = await aesKey(getSecret());
+    const key = await configAesKey(getSecret());
     const decrypted = await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
     return JSON.parse(new TextDecoder().decode(decrypted)) as T;
   } catch {

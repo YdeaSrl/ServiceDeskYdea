@@ -16,8 +16,8 @@ export default function AlarmBanner({ newTickets }: Props) {
   const isBreach = breached.length > 0;
   const count = isBreach ? breached.length : warned.length;
   const label = isBreach
-    ? `🚨  ${count} ticket NUOVO${count > 1 ? 'I' : ''} senza risposta da oltre 8h — SLA SCADUTO  🚨`
-    : `⚠️  ${count} ticket in scadenza SLA entro 2 ore`;
+    ? `🚨  ${count} ticket NUOVO${count > 1 ? 'I' : ''} senza risposta da oltre 2h — SLA SCADUTO  🚨`
+    : `⚠️  ${count} ticket in scadenza SLA entro 30 min`;
 
   return (
     <div

@@ -1,30 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAllOpenTickets, fetchClosedToday, fetchUsers, fetchTicketInfo, getUserFullName } from '@/app/lib/ydea';
-import type { YdeaCreds } from '@/app/lib/ydea';
+import { fetchAllTicketsInStates, fetchClosedToday, fetchUsers, fetchTicketInfo, getUserFullName } from '@/app/lib/ydea';
 import { isClosedState } from '@/app/lib/sla';
 import { MOCK_DATA } from '@/app/lib/mockData';
-import { decryptConfig } from '@/app/lib/session';
+import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
 import type { DashboardData } from '@/app/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-async function resolveCreds(req: NextRequest): Promise<YdeaCreds | null> {
-  const cookie = req.cookies.get('ydea_config')?.value;
-  if (cookie) {
-    const cfg = await decryptConfig<YdeaCreds>(cookie);
-    if (cfg?.apiId && cfg?.apiKey) return cfg;
-  }
-  const apiId  = process.env.YDEA_API_ID;
-  const apiKey = process.env.YDEA_API_KEY;
-  if (apiId && apiId !== 'IL_TUO_ID_AZIENDA' && apiKey) {
-    return { apiId, apiKey };
-  }
-  return null;
-}
-
 export async function GET(req: NextRequest) {
-  const creds = await resolveCreds(req);
+  const creds = await resolveCredsFromRequest(req);
 
   if (!creds) {
     return NextResponse.json(
@@ -34,17 +19,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [allTickets, ticketInfo, users] = await Promise.all([
-      fetchAllOpenTickets(creds),
+    const [ticketInfo, users] = await Promise.all([
       fetchTicketInfo(creds),
       fetchUsers(creds),
     ]);
 
-    const openTickets = allTickets.filter(t => !isClosedState(t.stato));
-
     const closedStateIds = ticketInfo.stati
       .filter(s => isClosedState(s.nome))
       .map(s => String(s.id));
+
+    const openStateIds = ticketInfo.stati
+      .filter(s => !isClosedState(s.nome))
+      .map(s => String(s.id));
+
+    const allTickets = await fetchAllTicketsInStates(openStateIds, creds);
+    const openTickets = allTickets.filter(t => !isClosedState(t.stato));
 
     const closedToday = await fetchClosedToday(closedStateIds, creds);
 
@@ -61,7 +50,6 @@ export async function GET(req: NextRequest) {
       if (v == null) return true;
       if (typeof v === 'string') return v.trim() === '';
       if (typeof v === 'object' && v !== null) {
-        // Non-empty if any value in the object is a non-empty string
         return !Object.values(v as Record<string, unknown>).some(
           val => typeof val === 'string' && (val as string).trim() !== ''
         );
