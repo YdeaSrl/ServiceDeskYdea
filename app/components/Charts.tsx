@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ChartsData } from '@/app/types';
 
 const CHART_COLORS = ['#009FE3', '#059669', '#EA580C', '#7C3AED', '#E11D48'];
@@ -195,10 +195,40 @@ function Skeleton() {
   );
 }
 
-interface Props { chartsData?: ChartsData | null; }
+function ErrorCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div style={{ flex: 1, minWidth: 0, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+      <span style={{ fontSize: '10px', color: 'var(--sla-breach)', fontWeight: 600 }}>Errore caricamento grafici</span>
+      <button
+        onClick={onRetry}
+        style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', color: 'var(--text-2)', fontWeight: 600 }}
+      >
+        Riprova
+      </button>
+    </div>
+  );
+}
 
-export default function Charts({ chartsData }: Props) {
-  if (!chartsData) {
+export default function Charts() {
+  const [data, setData] = useState<ChartsData | null>(null);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  function load() {
+    setError(false);
+    setLoading(true);
+    fetch('/api/charts')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(d => {
+        if (d && !d.error) { setData(d); setLoading(false); }
+        else { setError(true); setLoading(false); }
+      })
+      .catch(() => { setError(true); setLoading(false); });
+  }
+
+  useEffect(() => { load(); }, []);
+
+  if (loading) {
     return (
       <div style={{ display: 'flex', gap: '12px', height: '100%', padding: '0 14px 14px' }}>
         <Skeleton /><Skeleton />
@@ -206,7 +236,15 @@ export default function Charts({ chartsData }: Props) {
     );
   }
 
-  const { monthly, byType, types, months } = chartsData;
+  if (error || !data) {
+    return (
+      <div style={{ display: 'flex', gap: '12px', height: '100%', padding: '0 14px 14px' }}>
+        <ErrorCard onRetry={load} /><ErrorCard onRetry={load} />
+      </div>
+    );
+  }
+
+  const { monthly, byType, types, months } = data;
 
   const chart1Series = [
     { name: 'Aperti', values: monthly.map(p => p.opened) },

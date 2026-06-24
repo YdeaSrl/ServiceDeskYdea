@@ -4,6 +4,7 @@ import { isClosedState } from '@/app/lib/sla';
 import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 
 function toMonthKey(dateStr: string): string {

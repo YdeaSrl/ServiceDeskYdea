@@ -70,7 +70,7 @@ async function fetchWithStates(path: string, creds: YdeaCreds, statiIds: string[
   return fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
 }
 
-// ── Ticket Info ──────────────────────────────────────────────────────────────
+// ── Ticket Info ───────────────────────────────────────────────────────────────────
 
 function normaliseInfoField(raw: unknown): TicketInfoItem[] {
   if (!raw) return [];
@@ -109,7 +109,7 @@ export async function fetchTicketInfo(creds?: YdeaCreds): Promise<TicketInfo> {
   return result;
 }
 
-// ── Tickets ──────────────────────────────────────────────────────────────────
+// ── Tickets ────────────────────────────────────────────────────────────────────────
 
 function extractTickets(data: Record<string, unknown>): Ticket[] {
   const list = data.objs ?? data.tickets ?? data.data ?? data.items ?? [];
@@ -173,30 +173,13 @@ export async function fetchClosedToday(statiIds: string[], creds?: YdeaCreds): P
   const c = creds ?? envCreds();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const res = await fetchWithStates('/app_api_v2/tickets', c, statiIds, {
-    dataModificaDa: todayStart.toISOString(),
-  });
-  if (!res.ok) return [];
-  const data: Record<string, unknown> = await res.json();
-  return extractTickets(data);
-}
-
-export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?: YdeaCreds): Promise<Ticket[]> {
-  if (statiIds.length === 0) return [];
-  const c = creds ?? envCreds();
-  // Cache key uses year+month so a new month invalidates the cache automatically
-  const cacheKey = `${c.apiId}:${c.apiKey}:${from.getFullYear()}-${from.getMonth()}`;
-  const cached = closedSinceYearCache.get(cacheKey);
-  const now = Date.now();
-  if (cached && cached.expiresAt > now) return cached.data;
-
   const token = await getToken(c);
-  const MAX_PAGES = 300;
+  const MAX_PAGES = 20; // 400 tickets closed in a single day is more than enough
   const all: Ticket[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = new URL(`${BASE_URL}/app_api_v2/tickets`);
     statiIds.forEach(id => url.searchParams.append('stato[]', id));
-    url.searchParams.set('dataModificaDa', from.toISOString());
+    url.searchParams.set('dataModificaDa', todayStart.toISOString());
     url.searchParams.set('page', String(page));
     const res = await fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
     if (!res.ok) break;
@@ -212,11 +195,55 @@ export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?
       if (tickets.length < 20) break;
     }
   }
+  return all;
+}
+
+export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?: YdeaCreds): Promise<Ticket[]> {
+  if (statiIds.length === 0) return [];
+  const c = creds ?? envCreds();
+  // Cache key uses year+month so a new month invalidates the cache automatically
+  const cacheKey = `${c.apiId}:${c.apiKey}:${from.getFullYear()}-${from.getMonth()}`;
+  const cached = closedSinceYearCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.data;
+
+  const token = await getToken(c);
+  const BATCH = 5; // 5 concurrent pages: ~10s instead of ~52s sequential
+  const MAX_PAGES = 300;
+  const all: Ticket[] = [];
+  let startPage = 1;
+  let done = false;
+
+  while (!done && startPage <= MAX_PAGES) {
+    const pageNums = Array.from({ length: BATCH }, (_, i) => startPage + i).filter(p => p <= MAX_PAGES);
+    const batchResults = await Promise.all(pageNums.map(async (pageNum) => {
+      const url = new URL(`${BASE_URL}/app_api_v2/tickets`);
+      statiIds.forEach(id => url.searchParams.append('stato[]', id));
+      url.searchParams.set('dataModificaDa', from.toISOString());
+      url.searchParams.set('page', String(pageNum));
+      const res = await fetch(url.toString(), { headers: authHeaders(token), cache: 'no-store' });
+      if (!res.ok) return { pageNum, tickets: [] as Ticket[], isLast: true };
+      const data = await res.json() as Record<string, unknown>;
+      const tickets = extractTickets(data);
+      const total = Number(data.total ?? data.count ?? data.totalCount ?? 0);
+      const perPage = Number(data.perPage ?? data.per_page ?? data.limit ?? 0);
+      const isLast = (total > 0 && perPage > 0) ? total <= pageNum * perPage : tickets.length < 20;
+      return { pageNum, tickets, isLast };
+    }));
+
+    batchResults.sort((a, b) => a.pageNum - b.pageNum);
+    for (const { tickets, isLast } of batchResults) {
+      all.push(...tickets);
+      if (isLast) { done = true; break; }
+    }
+    startPage += BATCH;
+  }
+
   closedSinceYearCache.set(cacheKey, { data: all, expiresAt: now + 55 * 60_000 });
   return all;
 }
 
-// ── Users ────────────────────────────────────────────────────────────────────
+// ── Users ──────────────────────────────────────────────────────────────────────────
 
 export async function fetchUsers(creds?: YdeaCreds): Promise<User[]> {
   const c = creds ?? envCreds();
