@@ -68,6 +68,8 @@ export interface ClientCriticality {
   totalOpen: number;
   urgentCount: number;
   highCount: number;
+  mediumCount: number;
+  lowCount: number;
   maxPriority: PriorityLevel;
 }
 
@@ -87,6 +89,7 @@ export interface DashboardData {
   lastUpdated: string;
   openedTodayCount?: number;
   openedThisMonthCount?: number;
+  chartsData?: ChartsData;
   fetchError?: string;
   isMock?: boolean;
 }

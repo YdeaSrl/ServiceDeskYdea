@@ -20,8 +20,7 @@ export default function DashboardPage() {
 
   const urgentActiveCount = data.tickets.filter(t => isUrgentActive(t)).length;
   const breachCount = newTickets.filter(t => getSlaInfo(t).status === 'breach').length;
-  const allOpen = newTickets.length + inProgressTickets.length;
-  const slaOkPct = allOpen > 0 ? Math.round(((allOpen - breachCount) / allOpen) * 100) : 100;
+  const slaOkPct = newTickets.length > 0 ? Math.round(((newTickets.length - breachCount) / newTickets.length) * 100) : 100;
 
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -35,7 +34,7 @@ export default function DashboardPage() {
     router.replace('/login');
   }
 
-  /* ── 5-row grid ──────────────────────────────────────────────────────────────────
+  /* ── 5-row grid ────────────────────────────────────────────────────────────
      Row 1: 56px   header
      Row 2: auto   alarm banner — ALWAYS a DOM node (div wrapper), height=0 when no alarm
      Row 3: auto   KPI banner
@@ -45,7 +44,7 @@ export default function DashboardPage() {
   return (
     <div style={{ display: 'grid', gridTemplateRows: '56px auto auto 1fr 220px', height: '100vh', background: 'var(--ground)' }}>
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', padding: '0 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', zIndex: 20 }}>
 
         {/* Left: brand */}
@@ -162,8 +161,8 @@ export default function DashboardPage() {
         </main>
       )}
 
-      {/* ── Charts (fixed 220px) ────────────────────────────────────────── */}
-      <Charts />
+      {/* ── Charts (fixed 220px) ─────────────────────────────────────────── */}
+      <Charts chartsData={data.chartsData} />
 
     </div>
   );

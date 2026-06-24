@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ChartsData } from '@/app/types';
 
 const CHART_COLORS = ['#009FE3', '#059669', '#EA580C', '#7C3AED', '#E11D48'];
@@ -16,8 +16,10 @@ function MiniLineChart({
   labels: string[];
   colors: string[];
 }) {
-  const W = 500, H = 90;
-  const MT = 10, MR = 12, MB = 22, ML = 28;
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const W = 500, H = 150;
+  const MT = 14, MR = 14, MB = 26, ML = 32;
   const pw = W - ML - MR;
   const ph = H - MT - MB;
 
@@ -27,6 +29,14 @@ function MiniLineChart({
 
   const xPos = (i: number) => ML + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw);
   const yPos = (v: number) => MT + ph - (v / maxV) * ph;
+
+  const ttWidth = 110;
+  const ttLineH = 14;
+  const ttH = (series.length + 1) * ttLineH + 10;
+  const ttX = hoverIdx !== null && xPos(hoverIdx) + ttWidth + 8 > W - MR
+    ? xPos(hoverIdx) - ttWidth - 6
+    : hoverIdx !== null ? xPos(hoverIdx) + 6 : 0;
+  const ttY = MT;
 
   return (
     <div style={{
@@ -57,11 +67,12 @@ function MiniLineChart({
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ flex: 1, minHeight: 0, width: '100%', height: '100%' }}
+        style={{ flex: 1, minHeight: 0, width: '100%', height: '100%', cursor: 'crosshair' }}
         preserveAspectRatio="none"
+        onMouseLeave={() => setHoverIdx(null)}
       >
         {/* Horizontal grid lines */}
-        {[0, 0.5, 1].map(f => (
+        {[0, 0.25, 0.5, 0.75, 1].map(f => (
           <line
             key={f}
             x1={ML} y1={MT + f * ph}
@@ -94,30 +105,81 @@ function MiniLineChart({
         {series.map((s, si) => s.values.map((v, i) => (
           <circle
             key={`${si}-${i}`}
-            cx={xPos(i)} cy={yPos(v)} r={2.5}
+            cx={xPos(i)} cy={yPos(v)} r={hoverIdx === i ? 4 : 2.5}
             fill={colors[si % colors.length]}
             stroke="var(--surface)" strokeWidth={1}
           />
         )))}
 
+        {/* Invisible hit areas per column */}
+        {n > 0 && Array.from({ length: n }, (_, i) => {
+          const x0 = i === 0 ? ML : (xPos(i - 1) + xPos(i)) / 2;
+          const x1 = i === n - 1 ? W - MR : (xPos(i) + xPos(i + 1)) / 2;
+          return (
+            <rect
+              key={i}
+              x={x0} y={MT}
+              width={x1 - x0} height={ph}
+              fill="transparent"
+              onMouseEnter={() => setHoverIdx(i)}
+            />
+          );
+        })}
+
+        {/* Crosshair + tooltip */}
+        {hoverIdx !== null && (
+          <g>
+            <line
+              x1={xPos(hoverIdx)} y1={MT}
+              x2={xPos(hoverIdx)} y2={H - MB}
+              stroke="var(--text-3)" strokeWidth={1} strokeDasharray="3,2"
+            />
+            <rect
+              x={ttX} y={ttY}
+              width={ttWidth} height={ttH}
+              rx={4}
+              fill="var(--surface)"
+              stroke="var(--border)"
+              strokeWidth={1}
+            />
+            <text x={ttX + 8} y={ttY + 11} fontSize={8.5} fontWeight={700} fill="var(--text-2)">
+              {labels[hoverIdx]}
+            </text>
+            {series.map((s, si) => (
+              <g key={si}>
+                <rect
+                  x={ttX + 8} y={ttY + 10 + (si + 1) * ttLineH - 4}
+                  width={8} height={2}
+                  fill={colors[si % colors.length]}
+                  rx={1}
+                />
+                <text x={ttX + 20} y={ttY + 10 + (si + 1) * ttLineH} fontSize={8} fill="var(--text-3)">
+                  {s.name}:{' '}
+                  <tspan fontWeight={700} fill="var(--text)">{s.values[hoverIdx]}</tspan>
+                </text>
+              </g>
+            ))}
+          </g>
+        )}
+
         {/* X-axis labels */}
         {labels.map((l, i) => (
           <text
             key={l}
-            x={xPos(i)} y={H - 4}
+            x={xPos(i)} y={H - 6}
             textAnchor="middle"
             fontSize={7.5}
-            fill="var(--text-3)"
+            fill={hoverIdx === i ? 'var(--text-2)' : 'var(--text-3)'}
           >
             {l}
           </text>
         ))}
 
-        {/* Y max */}
-        <text x={ML - 3} y={MT} textAnchor="end" dominantBaseline="hanging" fontSize={7} fill="var(--text-3)">
+        {/* Y axis labels */}
+        <text x={ML - 4} y={MT} textAnchor="end" dominantBaseline="hanging" fontSize={7} fill="var(--text-3)">
           {maxV}
         </text>
-        <text x={ML - 3} y={H - MB} textAnchor="end" dominantBaseline="auto" fontSize={7} fill="var(--text-3)">
+        <text x={ML - 4} y={H - MB} textAnchor="end" dominantBaseline="auto" fontSize={7} fill="var(--text-3)">
           0
         </text>
       </svg>
@@ -133,17 +195,10 @@ function Skeleton() {
   );
 }
 
-export default function Charts() {
-  const [data, setData] = useState<ChartsData | null>(null);
+interface Props { chartsData?: ChartsData | null; }
 
-  useEffect(() => {
-    fetch('/api/charts')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && !d.error) setData(d); })
-      .catch(() => {});
-  }, []);
-
-  if (!data) {
+export default function Charts({ chartsData }: Props) {
+  if (!chartsData) {
     return (
       <div style={{ display: 'flex', gap: '12px', height: '100%', padding: '0 14px 14px' }}>
         <Skeleton /><Skeleton />
@@ -151,7 +206,7 @@ export default function Charts() {
     );
   }
 
-  const { monthly, byType, types, months } = data;
+  const { monthly, byType, types, months } = chartsData;
 
   const chart1Series = [
     { name: 'Aperti', values: monthly.map(p => p.opened) },

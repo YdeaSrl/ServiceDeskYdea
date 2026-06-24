@@ -3,7 +3,7 @@ import { fetchAllTicketsInStates, fetchAllClosedSince, fetchClosedToday, fetchUs
 import { isClosedState } from '@/app/lib/sla';
 import { MOCK_DATA } from '@/app/lib/mockData';
 import { resolveCredsFromRequest } from '@/app/lib/resolveCredentials';
-import type { DashboardData } from '@/app/types';
+import type { DashboardData, ChartsData } from '@/app/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -36,22 +36,85 @@ export async function GET(req: NextRequest) {
     const firstOfMonth = new Date(now2.getFullYear(), now2.getMonth(), 1);
     firstOfMonth.setHours(0, 0, 0, 0);
     const todayStart = new Date(now2.getFullYear(), now2.getMonth(), now2.getDate());
+    // Extend yearly fetch to January — expensive but cached for 55 minutes in ydea.ts
+    const janFirst = new Date(now2.getFullYear(), 0, 1);
+    janFirst.setHours(0, 0, 0, 0);
 
-    const [allTickets, closedToday, closedThisMonth] = await Promise.all([
+    const [allTickets, closedToday, closedSinceJan] = await Promise.all([
       fetchAllTicketsInStates(openStateIds, creds),
       fetchClosedToday(closedStateIds, creds),
-      fetchAllClosedSince(closedStateIds, firstOfMonth, creds),
+      fetchAllClosedSince(closedStateIds, janFirst, creds),
     ]);
 
     const openTickets = allTickets.filter(t => !isClosedState(t.stato));
 
-    // Tickets created this month among closed ones (modification date >= firstOfMonth, filter by creation date)
-    const closedCreatedThisMonth = closedThisMonth.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length;
+    // KPI counts — filter yearly data down to this month/today
+    const closedCreatedThisMonth = closedSinceJan.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length;
     const openedThisMonthCount = openTickets.filter(t => new Date(t.dataCreazione) >= firstOfMonth).length + closedCreatedThisMonth;
 
-    // Tickets created today among closed ones (closedToday has dataModifica >= todayStart)
     const closedCreatedToday = closedToday.filter(t => new Date(t.dataCreazione) >= todayStart).length;
     const openedTodayCount = openTickets.filter(t => new Date(t.dataCreazione) >= todayStart).length + closedCreatedToday;
+
+    // ── Charts data (computed from already-fetched data, no extra YDEA calls) ──
+    const months: string[] = [];
+    for (let m = 0; m <= now2.getMonth(); m++) {
+      const d = new Date(now2.getFullYear(), m, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+
+    function toMonthKey(dateStr: string): string {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    function monthLabel(key: string): string {
+      const [year, month] = key.split('-');
+      const d = new Date(Number(year), Number(month) - 1, 1);
+      return d.toLocaleDateString('it-IT', { month: 'short', year: '2-digit' });
+    }
+
+    const openTicketIds = new Set(openTickets.map(t => t.id));
+    const uniqueClosedTickets = closedSinceJan.filter(t => !openTicketIds.has(t.id));
+    const allTicketsForCharts = [...openTickets, ...uniqueClosedTickets];
+
+    const openedByMonth = new Map<string, number>(months.map(m => [m, 0]));
+    for (const t of allTicketsForCharts) {
+      const m = toMonthKey(t.dataCreazione);
+      if (openedByMonth.has(m)) openedByMonth.set(m, (openedByMonth.get(m) ?? 0) + 1);
+    }
+
+    const closedByMonth = new Map<string, number>(months.map(m => [m, 0]));
+    for (const t of closedSinceJan) {
+      const m = toMonthKey(t.dataModifica ?? t.dataCreazione ?? '');
+      if (closedByMonth.has(m)) closedByMonth.set(m, (closedByMonth.get(m) ?? 0) + 1);
+    }
+
+    const typeMap = new Map<string, Map<string, number>>();
+    for (const t of allTicketsForCharts) {
+      const tipo = (t.tipo as string | undefined)?.trim() || 'N/D';
+      const m = toMonthKey(t.dataCreazione);
+      if (!months.includes(m)) continue;
+      if (!typeMap.has(tipo)) typeMap.set(tipo, new Map(months.map(m2 => [m2, 0])));
+      const tm = typeMap.get(tipo)!;
+      tm.set(m, (tm.get(m) ?? 0) + 1);
+    }
+
+    const allTypes = [...typeMap.keys()].sort(
+      (a, b) => [...(typeMap.get(b)?.values() ?? [])].reduce((s, n) => s + n, 0)
+              - [...(typeMap.get(a)?.values() ?? [])].reduce((s, n) => s + n, 0)
+    ).slice(0, 5);
+
+    const byType: Record<string, number[]> = {};
+    for (const tipo of allTypes) {
+      byType[tipo] = months.map(m => typeMap.get(tipo)?.get(m) ?? 0);
+    }
+
+    const chartsData: ChartsData = {
+      monthly: months.map(m => ({ label: monthLabel(m), opened: openedByMonth.get(m) ?? 0, closed: closedByMonth.get(m) ?? 0 })),
+      byType,
+      types: allTypes,
+      months: months.map(monthLabel),
+    };
 
     const internalUsers = users.filter(u => {
       const ruoli = u['ruoli'] as string[] | undefined;
@@ -92,6 +155,7 @@ export async function GET(req: NextRequest) {
       lastUpdated: new Date().toISOString(),
       openedTodayCount,
       openedThisMonthCount,
+      chartsData,
     };
 
     return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } });

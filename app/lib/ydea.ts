@@ -17,6 +17,12 @@ function envCreds(): YdeaCreds {
 // Token cache keyed by "apiId:apiKey"
 const tokenCache = new Map<string, { value: string; expiresAt: number }>();
 
+// TicketInfo cache (rarely changes)
+const ticketInfoCache = new Map<string, { data: TicketInfo; expiresAt: number }>();
+
+// Yearly closed-tickets cache (expensive: ~175 pages). Key: "apiId:year"
+const closedSinceYearCache = new Map<string, { data: Ticket[]; expiresAt: number }>();
+
 async function getToken(creds: YdeaCreds): Promise<string> {
   const key = `${creds.apiId}:${creds.apiKey}`;
   const cached = tokenCache.get(key);
@@ -86,14 +92,21 @@ function normaliseInfoField(raw: unknown): TicketInfoItem[] {
 
 export async function fetchTicketInfo(creds?: YdeaCreds): Promise<TicketInfo> {
   const c = creds ?? envCreds();
+  const cacheKey = `${c.apiId}:${c.apiKey}`;
+  const cached = ticketInfoCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.data;
+
   const data = await apiFetch<Record<string, unknown>>('/app_api_v2/ticket/info', c);
-  return {
+  const result: TicketInfo = {
     stati:    normaliseInfoField(data.stato   ?? data.stati   ?? data.states),
     priorita: normaliseInfoField(data.priorita ?? data.priorities),
     fonti:    normaliseInfoField(data.fonte   ?? data.fonti   ?? data.sources),
     tipi:     normaliseInfoField(data.tipo    ?? data.tipi    ?? data.types),
     raw:      data,
   };
+  ticketInfoCache.set(cacheKey, { data: result, expiresAt: now + 5 * 60_000 });
+  return result;
 }
 
 // ── Tickets ──────────────────────────────────────────────────────────────────
@@ -171,6 +184,12 @@ export async function fetchClosedToday(statiIds: string[], creds?: YdeaCreds): P
 export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?: YdeaCreds): Promise<Ticket[]> {
   if (statiIds.length === 0) return [];
   const c = creds ?? envCreds();
+  // Cache key uses year+month so a new month invalidates the cache automatically
+  const cacheKey = `${c.apiId}:${c.apiKey}:${from.getFullYear()}-${from.getMonth()}`;
+  const cached = closedSinceYearCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.data;
+
   const token = await getToken(c);
   const MAX_PAGES = 300;
   const all: Ticket[] = [];
@@ -193,6 +212,7 @@ export async function fetchAllClosedSince(statiIds: string[], from: Date, creds?
       if (tickets.length < 20) break;
     }
   }
+  closedSinceYearCache.set(cacheKey, { data: all, expiresAt: now + 55 * 60_000 });
   return all;
 }
 
