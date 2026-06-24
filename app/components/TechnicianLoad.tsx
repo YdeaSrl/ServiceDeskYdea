@@ -2,7 +2,7 @@
 
 import type { Ticket, User, TechnicianSummary } from '@/app/types';
 import { getAssigneeName, getUserFullName } from '@/app/lib/ydea';
-import { getPriorityLevel, formatTimeAgo, isToday } from '@/app/lib/sla';
+import { getPriorityLevel, formatTimeAgo, isNewState, isClosedState } from '@/app/lib/sla';
 
 interface Props {
   inProgressTickets: Ticket[];
@@ -54,16 +54,15 @@ function PanelHead({ label, count }: { label: string; count?: number }) {
   );
 }
 
-export default function TechnicianLoad({ inProgressTickets, newTickets, users }: Props) {
+export default function TechnicianLoad({ inProgressTickets, closedToday, newTickets, users }: Props) {
   const techLoad = buildTechLoad(inProgressTickets, users);
   const maxLoad = Math.max(1, ...techLoad.map(t => t.ticketCount));
 
-  const recentNew = [...newTickets, ...inProgressTickets]
+  const recentNew = [...newTickets, ...inProgressTickets, ...closedToday]
     .filter(t => Date.now() - new Date(t.dataCreazione).getTime() < 3_600_000)
     .sort((a, b) => new Date(b.dataCreazione).getTime() - new Date(a.dataCreazione).getTime())
+    .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
     .slice(0, 8);
-
-  const openedToday = [...newTickets, ...inProgressTickets].filter(t => isToday(t.dataCreazione)).length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '12px' }}>
@@ -116,23 +115,26 @@ export default function TechnicianLoad({ inProgressTickets, newTickets, users }:
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           {recentNew.length === 0 ? (
             <span style={{ fontSize: '11px', color: 'var(--text-3)', padding: '4px' }}>Nessun nuovo ticket</span>
-          ) : recentNew.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: 6, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--accent)', flexShrink: 0 }}>#{t.codice}</span>
-              <span style={{ fontSize: '11px', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{t.ragioneSociale}</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)', flexShrink: 0 }}>{formatTimeAgo(t.dataCreazione)}</span>
-            </div>
-          ))}
-        </div>
-      </Panel>
-
-      {/* KPI tile — Aperti oggi */}
-      <Panel>
-        <div style={{ padding: '10px' }}>
-          <div style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', padding: '10px 8px', textAlign: 'center', background: 'var(--surface)', boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: '38px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: 'var(--accent)' }}>{openedToday}</div>
-            <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-3)', marginTop: '4px' }}>Aperti oggi</div>
-          </div>
+          ) : recentNew.map(t => {
+            const isClosed = isClosedState(t.stato);
+            const isNew = isNewState(t.stato);
+            const stateColor = isClosed
+              ? { bg: 'rgba(22,163,74,0.08)', border: 'rgba(22,163,74,0.25)', dot: '#16a34a' }
+              : isNew
+                ? { bg: 'rgba(220,38,38,0.08)', border: 'rgba(220,38,38,0.25)', dot: '#dc2626' }
+                : { bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.25)', dot: '#d97706' };
+            return (
+              <div key={t.id} title={t.stato} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: 6, background: stateColor.bg, border: `1px solid ${stateColor.border}` }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: stateColor.dot, flexShrink: 0 }} />
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--accent)', flexShrink: 0 }}>#{t.codice}</span>
+                <span style={{ fontSize: '11px', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)', minWidth: 0 }}>
+                  {t.ragioneSociale}
+                  <span style={{ fontWeight: 400, color: 'var(--text-3)' }}> · {t.stato}</span>
+                </span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)', flexShrink: 0 }}>{formatTimeAgo(t.dataCreazione)}</span>
+              </div>
+            );
+          })}
         </div>
       </Panel>
 
